@@ -1,0 +1,12 @@
+{
+  "name": "@ahub/web",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "node ./scripts/build.mjs",
+    "dev": "node --watch ./src/server.mjs",
+    "test": "node --test ./test/**/*.test.mjs",
+    "typecheck": "node --eval \"console.log('web typecheck placeholder')\""
+  }
+}
