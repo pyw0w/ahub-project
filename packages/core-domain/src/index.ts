@@ -1,6 +1,9 @@
-export type AccountLinkProvider = "gml" | "telegram" | "email";
+import {
+  assertAccountLinkRecordConsistency,
+  type AccountLink
+} from "./account-linking.js";
 
-export type AccountLinkStatus = "pending" | "linked" | "revoked";
+export * from "./account-linking.js";
 
 export type SeasonStatus = "draft" | "scheduled" | "active" | "completed" | "archived";
 
@@ -36,18 +39,6 @@ export type Profile = {
   locale: string;
   hardCurrencyBalance: number;
   softCurrencyBalance: number;
-  createdAt: string;
-  updatedAt: string;
-};
-
-export type AccountLink = {
-  id: string;
-  userId: string;
-  provider: AccountLinkProvider;
-  providerAccountId: string;
-  status: AccountLinkStatus;
-  linkedAt: string | null;
-  revokedAt: string | null;
   createdAt: string;
   updatedAt: string;
 };
@@ -140,16 +131,8 @@ export const assertCoreModelConsistency = (input: {
   assert(profile.softCurrencyBalance >= 0, "profile.soft_currency_balance cannot be negative");
 
   for (const accountLink of accountLinks) {
+    assertAccountLinkRecordConsistency(accountLink);
     assert(accountLink.userId === profile.userId, "account link must belong to the same user");
-    assert(accountLink.providerAccountId.length > 0, "account link provider account id is required");
-
-    if (accountLink.status === "linked") {
-      assert(accountLink.linkedAt !== null, "linked account link must have linkedAt");
-    }
-
-    if (accountLink.status === "revoked") {
-      assert(accountLink.revokedAt !== null, "revoked account link must have revokedAt");
-    }
   }
 
   assert(season.slug.length > 0, "season.slug is required");
