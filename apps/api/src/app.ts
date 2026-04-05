@@ -1,7 +1,19 @@
-import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
+import {
+  createServer,
+  type IncomingMessage,
+  type ServerResponse
+} from "node:http";
 
 import type { HealthPayload } from "@ahub/shared";
 
+import {
+  AuthBootstrapRequestError,
+  createAuthBootstrapService,
+  type AuthBootstrapService
+} from "./auth/bootstrap.js";
+import { GmlLauncherError } from "./auth/gml-client.js";
+import { createMockGmlLauncherClient } from "./auth/mock-gml-client.js";
+import { TelegramInitDataError } from "./auth/telegram.js";
 import type { ApiConfig } from "./config.js";
 
 export const buildHealthPayload = (config: ApiConfig): HealthPayload => ({
@@ -16,13 +28,89 @@ const writeJson = (response: ServerResponse, statusCode: number, body: unknown):
   response.end(JSON.stringify(body));
 };
 
-const routeRequest = (
+const readJsonBody = async (request: IncomingMessage): Promise<unknown> =>
+  await new Promise((resolve, reject) => {
+    let body = "";
+
+    request.setEncoding("utf8");
+    request.on("data", (chunk: string) => {
+      body += chunk;
+
+      if (body.length > 32_768) {
+        reject(new AuthBootstrapRequestError("invalid_request", "Request body is too large"));
+        request.destroy();
+      }
+    });
+    request.on("end", () => {
+      if (body.length === 0) {
+        reject(new AuthBootstrapRequestError("invalid_request", "Request body is required"));
+        return;
+      }
+
+      try {
+        resolve(JSON.parse(body) as unknown);
+      } catch {
+        reject(new AuthBootstrapRequestError("invalid_json", "Request body must be valid JSON"));
+      }
+    });
+    request.on("error", (error) => {
+      reject(error);
+    });
+  });
+
+const writeHandledError = (response: ServerResponse, error: unknown): void => {
+  if (error instanceof AuthBootstrapRequestError || error instanceof TelegramInitDataError) {
+    writeJson(response, error.statusCode, {
+      error: error.code,
+      message: error.message
+    });
+    return;
+  }
+
+  if (error instanceof GmlLauncherError) {
+    writeJson(response, 502, {
+      error: "gml_upstream_error",
+      code: error.code
+    });
+    return;
+  }
+
+  writeJson(response, 500, {
+    error: "internal_error"
+  });
+};
+
+type AppDependencies = {
+  authBootstrapService: AuthBootstrapService;
+};
+
+const buildDependencies = (config: ApiConfig): AppDependencies => ({
+  authBootstrapService: createAuthBootstrapService(config, createMockGmlLauncherClient({
+    mode: config.gmlMockMode
+  }))
+});
+
+const routeRequest = async (
   request: IncomingMessage,
   response: ServerResponse,
-  config: ApiConfig
-): void => {
+  config: ApiConfig,
+  dependencies: AppDependencies
+): Promise<void> => {
   if (request.url === "/healthz" || request.url === "/readyz") {
     writeJson(response, 200, buildHealthPayload(config));
+    return;
+  }
+
+  if (request.method === "POST" && request.url === "/api/auth/bootstrap") {
+    try {
+      const requestBody = await readJsonBody(request);
+      const result = await dependencies.authBootstrapService.bootstrap(requestBody);
+
+      writeJson(response, result.httpStatus, result.payload);
+    } catch (error) {
+      writeHandledError(response, error);
+    }
+
     return;
   }
 
@@ -31,7 +119,10 @@ const routeRequest = (
   });
 };
 
-export const createApp = (config: ApiConfig) =>
+export const createApp = (
+  config: ApiConfig,
+  dependencies: AppDependencies = buildDependencies(config)
+) =>
   createServer((request, response) => {
-    routeRequest(request, response, config);
+    void routeRequest(request, response, config, dependencies);
   });
