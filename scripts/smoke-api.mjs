@@ -6,7 +6,11 @@ import { resolve } from "node:path";
 const port = "3101";
 const server = spawn(resolve("node_modules/.bin/tsx"), ["apps/api/src/server.ts"], {
   cwd: process.cwd(),
-  env: { ...process.env, PORT: port },
+  env: {
+    ...process.env,
+    PORT: port,
+    TELEGRAM_BOT_TOKEN: process.env.TELEGRAM_BOT_TOKEN ?? "smoke-telegram-token"
+  },
   stdio: ["ignore", "pipe", "pipe"]
 });
 

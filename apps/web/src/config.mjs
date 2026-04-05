@@ -1,3 +1,6 @@
+import { existsSync, readFileSync } from "node:fs";
+import { resolve } from "node:path";
+
 const parsePort = (value) => {
   const parsed = Number(value ?? "3001");
 
@@ -8,17 +11,67 @@ const parsePort = (value) => {
   return parsed;
 };
 
-export const loadWebConfig = (env = process.env) => {
-  const apiBaseUrl = env.API_BASE_URL ?? "http://localhost:3000";
+const stripWrappingQuotes = (value) => {
+  if (
+    (value.startsWith("\"") && value.endsWith("\"")) ||
+    (value.startsWith("'") && value.endsWith("'"))
+  ) {
+    return value.slice(1, -1);
+  }
+
+  return value;
+};
+
+const loadEnvFromLocalFile = (env) => {
+  const envFilePath = resolve(process.cwd(), ".env.local");
+
+  if (!existsSync(envFilePath)) {
+    return env;
+  }
+
+  const fileEnv = readFileSync(envFilePath, "utf8")
+    .split(/\r?\n/u)
+    .reduce((accumulator, line) => {
+      const trimmedLine = line.trim();
+
+      if (trimmedLine.length === 0 || trimmedLine.startsWith("#")) {
+        return accumulator;
+      }
+
+      const separatorIndex = trimmedLine.indexOf("=");
+
+      if (separatorIndex === -1) {
+        return accumulator;
+      }
+
+      const key = trimmedLine.slice(0, separatorIndex).trim();
+      const value = stripWrappingQuotes(trimmedLine.slice(separatorIndex + 1).trim());
+
+      if (key.length > 0) {
+        accumulator[key] = value;
+      }
+
+      return accumulator;
+    }, {});
 
   return {
-    appName: env.WEB_APP_NAME ?? "AHub",
-    env: env.NODE_ENV ?? "development",
-    port: parsePort(env.WEB_PORT),
-    telegramBotName: env.TELEGRAM_BOT_NAME ?? "ahub_bot",
+    ...fileEnv,
+    ...env
+  };
+};
+
+export const loadWebConfig = (env = process.env) => {
+  const resolvedEnv = env === process.env ? loadEnvFromLocalFile(env) : env;
+  const apiBaseUrl = resolvedEnv.API_BASE_URL ?? "http://localhost:3000";
+
+  return {
+    appName: resolvedEnv.WEB_APP_NAME ?? "AHub",
+    env: resolvedEnv.NODE_ENV ?? "development",
+    port: parsePort(resolvedEnv.WEB_PORT),
+    telegramBotName: resolvedEnv.TELEGRAM_BOT_NAME ?? "ahub_bot",
     apiBaseUrl,
-    telemetryUrl: env.WEB_TELEMETRY_URL ?? `${apiBaseUrl}/client-telemetry`,
-    authMode: env.WEB_AUTH_MODE ?? "telegram-init-data",
+    telemetryUrl: resolvedEnv.WEB_TELEMETRY_URL ?? `${apiBaseUrl}/client-telemetry`,
+    authMode: resolvedEnv.WEB_AUTH_MODE ?? "telegram-init-data",
     endpoints: {
       auth: `${apiBaseUrl}/v1/auth/session`,
       profile: `${apiBaseUrl}/v1/profile/me`,

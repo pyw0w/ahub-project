@@ -1,7 +1,10 @@
 import assert from "node:assert/strict";
 import { createHmac } from "node:crypto";
 import { once } from "node:events";
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { type AddressInfo } from "node:net";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import test from "node:test";
 
 import { createAuthBootstrapService } from "./auth/bootstrap.js";
@@ -38,6 +41,46 @@ void test("loadConfig requires TELEGRAM_BOT_TOKEN", () => {
       }),
     /Missing required TELEGRAM_BOT_TOKEN/
   );
+});
+
+void test("loadConfig reads defaults from .env.local when env arg is omitted", () => {
+  const tempDir = mkdtempSync(join(tmpdir(), "ahub-api-config-"));
+  const originalCwd = process.cwd();
+  const originalEnv = {
+    APP_NAME: process.env.APP_NAME,
+    PORT: process.env.PORT,
+    TELEGRAM_BOT_TOKEN: process.env.TELEGRAM_BOT_TOKEN
+  };
+
+  writeFileSync(
+    join(tempDir, ".env.local"),
+    "APP_NAME=AHub Local API\nPORT=4010\nTELEGRAM_BOT_TOKEN=file-token\n"
+  );
+
+  delete process.env.APP_NAME;
+  delete process.env.PORT;
+  delete process.env.TELEGRAM_BOT_TOKEN;
+  process.chdir(tempDir);
+
+  try {
+    const config = loadConfig();
+
+    assert.equal(config.appName, "AHub Local API");
+    assert.equal(config.port, 4010);
+    assert.equal(config.telegramBotToken, "file-token");
+  } finally {
+    process.chdir(originalCwd);
+
+    for (const [key, value] of Object.entries(originalEnv)) {
+      if (typeof value === "string") {
+        process.env[key] = value;
+      } else {
+        delete process.env[key];
+      }
+    }
+
+    rmSync(tempDir, { recursive: true, force: true });
+  }
 });
 
 const testConfig: ApiConfig = {

@@ -35,4 +35,4 @@ npm run smoke
 
 ## Configuration
 
-Use `.env.example` as the source of truth for required keys. Keep real secrets out of git and inject them through local `.env.local` or the deployment platform.
+Use `.env.example` as the source of truth for required keys. Both API and web runtime load `.env.local` from the repository root automatically; keep real secrets out of git and inject them through that file locally or via the deployment platform.

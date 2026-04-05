@@ -1,3 +1,6 @@
+import { existsSync, readFileSync } from "node:fs";
+import { resolve } from "node:path";
+
 import type { MockGmlMode } from "./auth/mock-gml-client.js";
 
 const parsePort = (value: string | undefined): number => {
@@ -46,6 +49,55 @@ const parseMockMode = (value: string | undefined): MockGmlMode => {
   return mode;
 };
 
+const stripWrappingQuotes = (value: string): string => {
+  if (
+    (value.startsWith("\"") && value.endsWith("\"")) ||
+    (value.startsWith("'") && value.endsWith("'"))
+  ) {
+    return value.slice(1, -1);
+  }
+
+  return value;
+};
+
+const loadEnvFromLocalFile = (env: NodeJS.ProcessEnv): NodeJS.ProcessEnv => {
+  const envFilePath = resolve(process.cwd(), ".env.local");
+
+  if (!existsSync(envFilePath)) {
+    return env;
+  }
+
+  const fileEntries = readFileSync(envFilePath, "utf8")
+    .split(/\r?\n/u)
+    .reduce<NodeJS.ProcessEnv>((accumulator, line) => {
+      const trimmedLine = line.trim();
+
+      if (trimmedLine.length === 0 || trimmedLine.startsWith("#")) {
+        return accumulator;
+      }
+
+      const separatorIndex = trimmedLine.indexOf("=");
+
+      if (separatorIndex === -1) {
+        return accumulator;
+      }
+
+      const key = trimmedLine.slice(0, separatorIndex).trim();
+      const value = stripWrappingQuotes(trimmedLine.slice(separatorIndex + 1).trim());
+
+      if (key.length > 0) {
+        accumulator[key] = value;
+      }
+
+      return accumulator;
+    }, {});
+
+  return {
+    ...fileEntries,
+    ...env
+  };
+};
+
 export type ApiConfig = {
   appName: string;
   env: string;
@@ -57,21 +109,32 @@ export type ApiConfig = {
   gmlMockMode: MockGmlMode;
 };
 
-export const loadConfig = (env: NodeJS.ProcessEnv = process.env): ApiConfig => ({
-  appName: env.APP_NAME ?? "AHub API",
-  env: env.NODE_ENV ?? "development",
-  port: parsePort(env.PORT),
-  telegramBotToken: parseRequiredString(env.TELEGRAM_BOT_TOKEN, "TELEGRAM_BOT_TOKEN"),
+export const loadConfig = (env: NodeJS.ProcessEnv = process.env): ApiConfig => {
+  const resolvedEnv = env === process.env ? loadEnvFromLocalFile(env) : env;
+
+  return {
+  appName: resolvedEnv.APP_NAME ?? "AHub API",
+  env: resolvedEnv.NODE_ENV ?? "development",
+  port: parsePort(resolvedEnv.PORT),
+  telegramBotToken: parseRequiredString(
+    resolvedEnv.TELEGRAM_BOT_TOKEN,
+    "TELEGRAM_BOT_TOKEN"
+  ),
   telegramInitDataTtlSec: parsePositiveInteger(
-    env.TELEGRAM_INIT_DATA_TTL_SEC,
+    resolvedEnv.TELEGRAM_INIT_DATA_TTL_SEC,
     300,
     "TELEGRAM_INIT_DATA_TTL_SEC"
   ),
-  gmlTimeoutMs: parsePositiveInteger(env.GML_TIMEOUT_MS, 250, "GML_TIMEOUT_MS"),
+  gmlTimeoutMs: parsePositiveInteger(
+    resolvedEnv.GML_TIMEOUT_MS,
+    250,
+    "GML_TIMEOUT_MS"
+  ),
   gmlRetryAttempts: parsePositiveInteger(
-    env.GML_RETRY_ATTEMPTS,
+    resolvedEnv.GML_RETRY_ATTEMPTS,
     2,
     "GML_RETRY_ATTEMPTS"
   ),
-  gmlMockMode: parseMockMode(env.GML_MOCK_MODE)
-});
+  gmlMockMode: parseMockMode(resolvedEnv.GML_MOCK_MODE)
+  };
+};
