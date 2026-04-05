@@ -1,0 +1,19 @@
+{
+  "name": "@ahub/core-domain",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "build": "tsc --project tsconfig.json",
+    "test": "tsx --test src/**/*.test.ts",
+    "typecheck": "tsc --project tsconfig.json --noEmit"
+  },
+  "devDependencies": {
+    "@types/node": "^24.4.0",
+    "tsx": "^4.19.3",
+    "typescript": "^5.8.3"
+  }
+}
