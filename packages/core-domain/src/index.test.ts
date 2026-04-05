@@ -189,3 +189,45 @@ void test("assertCoreModelConsistency rejects duplicate provider links for one u
     /only one account link per provider is allowed for a user/
   );
 });
+
+void test("assertCoreModelConsistency rejects season windows that collapse in UTC order", () => {
+  assert.throws(
+    () =>
+      assertCoreModelConsistency({
+        profile,
+        accountLinks,
+        season: {
+          ...season,
+          startsAt: "2026-04-05T12:00:00.000Z",
+          endsAt: "2026-04-05T11:59:59.000Z"
+        },
+        progression,
+        rewards,
+        entitlements,
+        ledgerEntries
+      }),
+    /season.startsAt must be earlier than season.endsAt/
+  );
+});
+
+void test("assertCoreModelConsistency rejects duplicate ledger source keys", () => {
+  assert.throws(
+    () =>
+      assertCoreModelConsistency({
+        profile,
+        accountLinks,
+        season,
+        progression,
+        rewards,
+        entitlements,
+        ledgerEntries: [
+          ...ledgerEntries,
+          {
+            ...ledgerEntries[0],
+            id: "ledger_2"
+          }
+        ]
+      }),
+    /ledger entry source key must be unique within a ledger/
+  );
+});

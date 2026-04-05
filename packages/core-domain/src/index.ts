@@ -117,6 +117,8 @@ export type PaymentLedgerEntry = {
 const isIsoTimestamp = (value: string): boolean =>
   /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?Z$/.test(value);
 
+const parseIsoTimestamp = (value: string): number => Date.parse(value);
+
 const assert = (condition: boolean, message: string): void => {
   if (!condition) {
     throw new Error(message);
@@ -161,12 +163,12 @@ export const assertCoreModelConsistency = (input: {
   }
 
   assert(season.slug.length > 0, "season.slug is required");
-  assert(season.startsAt < season.endsAt, "season.startsAt must be earlier than season.endsAt");
-
-  if (season.status === "active") {
-    assert(isIsoTimestamp(season.startsAt), "season.startsAt must be ISO-8601");
-    assert(isIsoTimestamp(season.endsAt), "season.endsAt must be ISO-8601");
-  }
+  assert(isIsoTimestamp(season.startsAt), "season.startsAt must be ISO-8601");
+  assert(isIsoTimestamp(season.endsAt), "season.endsAt must be ISO-8601");
+  assert(
+    parseIsoTimestamp(season.startsAt) < parseIsoTimestamp(season.endsAt),
+    "season.startsAt must be earlier than season.endsAt"
+  );
 
   assert(progression.seasonId === season.id, "progression must reference the same season");
   assert(progression.profileId === profile.id, "progression must reference the same profile");
@@ -228,11 +230,19 @@ export const assertCoreModelConsistency = (input: {
     entitlementIds.add(entitlement.id);
   }
 
+  const ledgerSourceKeys = new Set<string>();
+
   for (const entry of ledgerEntries) {
     assert(entry.profileId === profile.id, "ledger entry must reference the same profile");
     assert(entry.amountMinor > 0n, "ledger entry amountMinor must be positive");
     assert(/^[A-Z]{3}$/.test(entry.currency), "ledger entry currency must be ISO-4217");
     assert(entry.sourceRef.length > 0, "ledger entry sourceRef is required");
+    const ledgerSourceKey = `${entry.sourceType}:${entry.sourceRef}`;
+    assert(
+      !ledgerSourceKeys.has(ledgerSourceKey),
+      "ledger entry source key must be unique within a ledger"
+    );
+    ledgerSourceKeys.add(ledgerSourceKey);
 
     if (entry.entitlementId !== null) {
       assert(entitlementIds.has(entry.entitlementId), "ledger entry entitlement must exist");
