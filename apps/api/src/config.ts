@@ -24,6 +24,14 @@ const parsePositiveInteger = (
   return parsed;
 };
 
+const parseRequiredString = (value: string | undefined, variableName: string): string => {
+  if (typeof value !== "string" || value.trim().length === 0) {
+    throw new Error(`Missing required ${variableName}`);
+  }
+
+  return value;
+};
+
 const parseMockMode = (value: string | undefined): MockGmlMode => {
   const mode = value ?? "success";
 
@@ -53,7 +61,7 @@ export const loadConfig = (env: NodeJS.ProcessEnv = process.env): ApiConfig => (
   appName: env.APP_NAME ?? "AHub API",
   env: env.NODE_ENV ?? "development",
   port: parsePort(env.PORT),
-  telegramBotToken: env.TELEGRAM_BOT_TOKEN ?? "dev-telegram-token",
+  telegramBotToken: parseRequiredString(env.TELEGRAM_BOT_TOKEN, "TELEGRAM_BOT_TOKEN"),
   telegramInitDataTtlSec: parsePositiveInteger(
     env.TELEGRAM_INIT_DATA_TTL_SEC,
     300,

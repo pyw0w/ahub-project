@@ -31,29 +31,52 @@ const writeJson = (response: ServerResponse, statusCode: number, body: unknown):
 const readJsonBody = async (request: IncomingMessage): Promise<unknown> =>
   await new Promise((resolve, reject) => {
     let body = "";
+    let oversized = false;
+    let settled = false;
 
     request.setEncoding("utf8");
     request.on("data", (chunk: string) => {
+      if (settled || oversized) {
+        return;
+      }
+
       body += chunk;
 
       if (body.length > 32_768) {
-        reject(new AuthBootstrapRequestError("invalid_request", "Request body is too large"));
-        request.destroy();
+        oversized = true;
       }
     });
     request.on("end", () => {
+      if (settled) {
+        return;
+      }
+
+      if (oversized) {
+        settled = true;
+        reject(new AuthBootstrapRequestError("invalid_request", "Request body is too large"));
+        return;
+      }
+
       if (body.length === 0) {
+        settled = true;
         reject(new AuthBootstrapRequestError("invalid_request", "Request body is required"));
         return;
       }
 
       try {
+        settled = true;
         resolve(JSON.parse(body) as unknown);
       } catch {
+        settled = true;
         reject(new AuthBootstrapRequestError("invalid_json", "Request body must be valid JSON"));
       }
     });
     request.on("error", (error) => {
+      if (settled) {
+        return;
+      }
+
+      settled = true;
       reject(error);
     });
   });

@@ -8,7 +8,7 @@ import { createAuthBootstrapService } from "./auth/bootstrap.js";
 import { GmlLauncherError, type GmlLauncherClient } from "./auth/gml-client.js";
 import { createMockGmlLauncherClient } from "./auth/mock-gml-client.js";
 import { buildHealthPayload, createApp } from "./app.js";
-import type { ApiConfig } from "./config.js";
+import { loadConfig, type ApiConfig } from "./config.js";
 
 void test("buildHealthPayload returns a stable service contract", () => {
   const payload = buildHealthPayload({
@@ -26,6 +26,18 @@ void test("buildHealthPayload returns a stable service contract", () => {
   assert.equal(payload.environment, "test");
   assert.equal(payload.status, "ok");
   assert.match(payload.timestamp, /^\d{4}-\d{2}-\d{2}T/);
+});
+
+void test("loadConfig requires TELEGRAM_BOT_TOKEN", () => {
+  assert.throws(
+    () =>
+      loadConfig({
+        PORT: "3000",
+        APP_NAME: "AHub API",
+        NODE_ENV: "test"
+      }),
+    /Missing required TELEGRAM_BOT_TOKEN/
+  );
 });
 
 const testConfig: ApiConfig = {
@@ -216,6 +228,31 @@ void test("POST /api/auth/bootstrap retries a transient timeout once before succ
 
     assert.equal(response.status, 200);
     assert.equal(attempts, 2);
+  } finally {
+    await server.close();
+  }
+});
+
+void test("POST /api/auth/bootstrap returns structured 400 for oversized request bodies", async () => {
+  const server = await startTestServer(createMockGmlLauncherClient());
+  const oversizedBody = "x".repeat(40_000);
+
+  try {
+    const response = await fetch(`${server.url}/api/auth/bootstrap`, {
+      method: "POST",
+      headers: {
+        "content-type": "application/json"
+      },
+      body: JSON.stringify({
+        initData: oversizedBody
+      })
+    });
+
+    assert.equal(response.status, 400);
+
+    const payload = (await response.json()) as { error: string; message: string };
+    assert.equal(payload.error, "invalid_request");
+    assert.equal(payload.message, "Request body is too large");
   } finally {
     await server.close();
   }
