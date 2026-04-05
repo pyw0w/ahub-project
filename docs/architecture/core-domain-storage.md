@@ -14,10 +14,12 @@ This module establishes the first persistent domain boundary for:
 
 - `users` and `profiles` stay split so auth providers can converge on one internal user while profile data remains product-facing.
 - `account_links` is provider-centric and globally unique on `(provider, provider_account_id)` to prevent identity collisions.
+- `account_links` also keeps one link slot per `(user_id, provider)` so relink flows stay deterministic for each provider.
 - `season_progressions` uses one row per `(season, profile)` to keep progression updates idempotent.
 - `reward_definitions` is immutable-by-level inside a season; uniqueness on `(season_id, level)` avoids ambiguous grants.
 - `entitlements` is the access-rights source of truth. Only one active entitlement per `(profile, sku)` is allowed.
 - `payment_ledger_entries` is append-only intent/history. External payment ids live in `source_ref` and remain unique within a `source_type`.
+- Storage-facing `BIGINT` fields stay `bigint` in TypeScript contracts until an explicit transport serialization layer is introduced.
 
 ## Cross-module contract
 

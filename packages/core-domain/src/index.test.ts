@@ -8,8 +8,8 @@ const profile: Profile = {
   userId: "user_1",
   handle: "miner01",
   locale: "ru-RU",
-  hardCurrencyBalance: 100,
-  softCurrencyBalance: 250,
+  hardCurrencyBalance: 100n,
+  softCurrencyBalance: 250n,
   createdAt: "2026-04-05T00:00:00.000Z",
   updatedAt: "2026-04-05T00:00:00.000Z"
 };
@@ -43,7 +43,7 @@ const progression: SeasonProgression = {
   id: "progression_1",
   seasonId: "season_1",
   profileId: "profile_1",
-  xp: 250,
+  xp: 250n,
   level: 3,
   lastGrantedRewardLevel: 2,
   updatedAt: "2026-04-05T00:00:00.000Z"
@@ -56,7 +56,7 @@ const rewards: RewardDefinition[] = [
     level: 1,
     rewardType: "currency",
     entitlementSku: null,
-    currencyAmount: 100,
+    currencyAmount: 100n,
     payloadJson: null,
     createdAt: "2026-04-05T00:00:00.000Z"
   },
@@ -96,7 +96,7 @@ const ledgerEntries: PaymentLedgerEntry[] = [
     direction: "credit",
     sourceType: "payment",
     sourceRef: "payment:telegram:1",
-    amountMinor: 999,
+    amountMinor: 999n,
     currency: "RUB",
     status: "posted",
     entitlementId: "entitlement_1",
@@ -164,5 +164,28 @@ void test("assertCoreModelConsistency rejects refund entries with credit directi
         ]
       }),
     /refund ledger entries must be debits/
+  );
+});
+
+void test("assertCoreModelConsistency rejects duplicate provider links for one user", () => {
+  assert.throws(
+    () =>
+      assertCoreModelConsistency({
+        profile,
+        accountLinks: [
+          ...accountLinks,
+          {
+            ...accountLinks[0],
+            id: "link_2",
+            providerAccountId: "telegram:user-2"
+          }
+        ],
+        season,
+        progression,
+        rewards,
+        entitlements,
+        ledgerEntries
+      }),
+    /only one account link per provider is allowed for a user/
   );
 });

@@ -34,8 +34,8 @@ export type Profile = {
   userId: string;
   handle: string;
   locale: string;
-  hardCurrencyBalance: number;
-  softCurrencyBalance: number;
+  hardCurrencyBalance: bigint;
+  softCurrencyBalance: bigint;
   createdAt: string;
   updatedAt: string;
 };
@@ -67,7 +67,7 @@ export type SeasonProgression = {
   id: string;
   seasonId: string;
   profileId: string;
-  xp: number;
+  xp: bigint;
   level: number;
   lastGrantedRewardLevel: number;
   updatedAt: string;
@@ -79,7 +79,7 @@ export type RewardDefinition = {
   level: number;
   rewardType: RewardType;
   entitlementSku: string | null;
-  currencyAmount: number | null;
+  currencyAmount: bigint | null;
   payloadJson: string | null;
   createdAt: string;
 };
@@ -105,7 +105,7 @@ export type PaymentLedgerEntry = {
   direction: LedgerDirection;
   sourceType: LedgerSourceType;
   sourceRef: string;
-  amountMinor: number;
+  amountMinor: bigint;
   currency: string;
   status: LedgerEntryStatus;
   entitlementId: string | null;
@@ -136,12 +136,20 @@ export const assertCoreModelConsistency = (input: {
 
   assert(profile.userId.length > 0, "profile.user_id is required");
   assert(profile.handle.length >= 3, "profile.handle must be at least 3 characters");
-  assert(profile.hardCurrencyBalance >= 0, "profile.hard_currency_balance cannot be negative");
-  assert(profile.softCurrencyBalance >= 0, "profile.soft_currency_balance cannot be negative");
+  assert(profile.hardCurrencyBalance >= 0n, "profile.hard_currency_balance cannot be negative");
+  assert(profile.softCurrencyBalance >= 0n, "profile.soft_currency_balance cannot be negative");
+
+  const accountLinkSlots = new Set<string>();
 
   for (const accountLink of accountLinks) {
     assert(accountLink.userId === profile.userId, "account link must belong to the same user");
     assert(accountLink.providerAccountId.length > 0, "account link provider account id is required");
+    const accountLinkSlot = `${accountLink.userId}:${accountLink.provider}`;
+    assert(
+      !accountLinkSlots.has(accountLinkSlot),
+      "only one account link per provider is allowed for a user"
+    );
+    accountLinkSlots.add(accountLinkSlot);
 
     if (accountLink.status === "linked") {
       assert(accountLink.linkedAt !== null, "linked account link must have linkedAt");
@@ -162,7 +170,7 @@ export const assertCoreModelConsistency = (input: {
 
   assert(progression.seasonId === season.id, "progression must reference the same season");
   assert(progression.profileId === profile.id, "progression must reference the same profile");
-  assert(progression.xp >= 0, "progression.xp cannot be negative");
+  assert(progression.xp >= 0n, "progression.xp cannot be negative");
   assert(progression.level >= 0, "progression.level cannot be negative");
   assert(
     progression.lastGrantedRewardLevel <= progression.level,
@@ -183,7 +191,7 @@ export const assertCoreModelConsistency = (input: {
 
     if (reward.rewardType === "currency") {
       assert(
-        reward.currencyAmount !== null && reward.currencyAmount > 0,
+        reward.currencyAmount !== null && reward.currencyAmount > 0n,
         "currency reward must define a positive currencyAmount"
       );
     }
@@ -222,7 +230,7 @@ export const assertCoreModelConsistency = (input: {
 
   for (const entry of ledgerEntries) {
     assert(entry.profileId === profile.id, "ledger entry must reference the same profile");
-    assert(entry.amountMinor > 0, "ledger entry amountMinor must be positive");
+    assert(entry.amountMinor > 0n, "ledger entry amountMinor must be positive");
     assert(/^[A-Z]{3}$/.test(entry.currency), "ledger entry currency must be ISO-4217");
     assert(entry.sourceRef.length > 0, "ledger entry sourceRef is required");
 

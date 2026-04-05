@@ -26,6 +26,7 @@ CREATE TABLE account_links (
   revoked_at TIMESTAMPTZ NULL,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  UNIQUE (user_id, provider),
   UNIQUE (provider, provider_account_id)
 );
 
