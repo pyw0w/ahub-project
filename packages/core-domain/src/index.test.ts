@@ -18,10 +18,14 @@ const accountLinks: AccountLink[] = [
   {
     id: "link_1",
     userId: "user_1",
-    provider: "gml",
-    providerAccountId: "gml:player-1",
+    telegramIdentityId: "telegram_identity_1",
+    externalAccountId: "external_account_1",
     status: "linked",
+    failureCode: null,
+    failureMessage: null,
+    requestedAt: "2026-04-05T00:00:00.000Z",
     linkedAt: "2026-04-05T00:00:00.000Z",
+    resolvedAt: "2026-04-05T00:00:00.000Z",
     revokedAt: null,
     createdAt: "2026-04-05T00:00:00.000Z",
     updatedAt: "2026-04-05T00:00:00.000Z"
